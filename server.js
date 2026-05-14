@@ -1,79 +1,48 @@
-/* global process */
 import express from "express";
 import cors from "cors";
-import nodemailer from "nodemailer";
 import dotenv from "dotenv";
+import { Resend } from "resend";
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
-
-transporter.verify((error, success) => {
-  if (error) {
-    console.log("SMTP ERROR:", error);
-  } else {
-    console.log("SMTP READY");
-  }
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 app.post("/api/contact", async (req, res) => {
-  const { name, email, message } = req.body;
+  try {
+    const { name, email, message } = req.body;
 
-  if (!name || !email || !message) {
-    return res.status(400).json({
-      error: "Please provide name, email, and message.",
-    });
-  }
-
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: process.env.EMAIL_USER,
-    subject: `New Contact Form Submission from ${name}`,
-    text: `
+    const data = await resend.emails.send({
+      from: "onboarding@resend.dev",
+      to: "nasimudheent22@gmail.com",
+      subject: `Message from ${name}`,
+      text: `
 Name: ${name}
 Email: ${email}
 
 Message:
 ${message}
-    `,
-    replyTo: email,
-  };
-
-  try {
-    await transporter.sendMail(mailOptions);
-
-    console.log("EMAIL SENT");
+      `,
+      replyTo: email,
+    });
 
     res.status(200).json({
       success: true,
-      message: "Email sent successfully!",
+      data,
     });
   } catch (error) {
-    console.error("Error sending email:", error);
+    console.error(error);
 
     res.status(500).json({
-      error: "Failed to send email.",
-      details: error.message,
+      error: error.message,
     });
   }
 });
 
-app.get("/", (req, res) => {
-  res.send("Backend is running");
-});
-
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+app.listen(process.env.PORT || 3000, () => {
+  console.log("Server running");
 });
